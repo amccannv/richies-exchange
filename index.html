@@ -387,6 +387,26 @@
 
         let priceChart = null;
         const historyCache = {};
+        let bondHistoryMap = null;
+
+        async function getBondHistoryMap() {
+            if (bondHistoryMap) return bondHistoryMap;
+            
+            try {
+                const response = await fetch('https://api.weirdgloop.org/exchange/history/rs/all?name=Bond');
+                const data = await response.json();
+                const bondHistory = data['Bond'] || [];
+                bondHistoryMap = new Map(bondHistory.map(d => [d.timestamp, d.price]));
+                return bondHistoryMap;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function gpToLocalHistorical(gp, currency, bondPriceAtTime) {
+            const bondPriceToUse = bondPriceAtTime || bondPrice;
+            return gp * (BOND_REAL_PRICES[currency].price / bondPriceToUse);
+        }
 
         async function openModal(itemName, volume) {
             const modal = document.getElementById('modal');
@@ -399,15 +419,19 @@
             modal.classList.add('active');
             
             try {
-                let historyData;
-                if (historyCache[itemName]) {
-                    historyData = historyCache[itemName];
-                } else {
-                    const response = await fetch(`https://api.weirdgloop.org/exchange/history/rs/all?name=${encodeURIComponent(itemName)}`);
-                    const data = await response.json();
-                    historyData = data[itemName] || [];
-                    historyCache[itemName] = historyData;
-                }
+                const [itemResult, bondMap] = await Promise.all([
+                    (async () => {
+                        if (historyCache[itemName]) return historyCache[itemName];
+                        const response = await fetch(`https://api.weirdgloop.org/exchange/history/rs/all?name=${encodeURIComponent(itemName)}`);
+                        const data = await response.json();
+                        const history = data[itemName] || [];
+                        historyCache[itemName] = history;
+                        return history;
+                    })(),
+                    getBondHistoryMap()
+                ]);
+                
+                const historyData = itemResult;
                 
                 if (historyData.length === 0) {
                     content.innerHTML = '<div class="modal-loading">No historical data available</div>';
@@ -421,7 +445,10 @@
                     const date = new Date(d.timestamp);
                     return date.toLocaleDateString('en-CA', { month: 'short', year: '2-digit' });
                 });
-                const prices = historyData.map(d => gpToLocal(d.price, currency));
+                const prices = historyData.map(d => {
+                    const bondPriceAtTime = bondMap ? bondMap.get(d.timestamp) : null;
+                    return gpToLocalHistorical(d.price, currency, bondPriceAtTime);
+                });
                 
                 const currentPrice = prices[prices.length - 1];
                 const firstPrice = prices[0];
