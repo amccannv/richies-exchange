@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grand Money Exchange</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 10px; color: #f0b90b; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 20px; }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        input, select {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            background: #2d2d44;
+            color: #fff;
+        }
+        input { flex: 1; min-width: 200px; }
+        input:focus, select:focus { outline: 2px solid #f0b90b; }
+        .stats {
+            background: #2d2d44;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        .stat-item { }
+        .stat-label { color: #888; font-size: 12px; }
+        .stat-value { font-size: 18px; font-weight: bold; color: #f0b90b; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #2d2d44;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td { padding: 12px 15px; text-align: left; }
+        th { background: #3d3d54; font-weight: 600; cursor: pointer; }
+        th:hover { background: #4d4d64; }
+        tr:nth-child(even) { background: #252538; }
+        tr:hover { background: #353548; }
+        .gp { color: #f0b90b; }
+        .local-currency { color: #4CAF50; font-weight: 600; }
+        .loading { text-align: center; padding: 40px; color: #888; }
+        .error { color: #ff6b6b; text-align: center; padding: 20px; }
+        
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #2d2d44;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            overflow: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .modal-title { font-size: 20px; font-weight: bold; color: #f0b90b; display: flex; align-items: center; gap: 10px; }
+        .modal-title img { width: 28px; height: 28px; object-fit: contain; }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 28px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .modal-close:hover { color: #fff; }
+        .modal-content-grid { display: flex; gap: 20px; align-items: flex-start; }
+        .modal-chart-wrapper { flex: 1; min-width: 0; }
+        .chart-container { position: relative; height: 400px; }
+        .modal-stats { display: flex; gap: 20px; margin-top: 15px; flex-wrap: wrap; }
+        .modal-stat { }
+        .modal-stat-label { color: #888; font-size: 12px; }
+        .modal-stat-value { font-size: 16px; font-weight: bold; color: #4CAF50; }
+        .item-row { cursor: pointer; }
+        .item-row:hover { background: #404060 !important; }
+        .item-name-cell { display: flex; align-items: center; gap: 10px; }
+        .item-thumb { width: 28px; height: 28px; object-fit: contain; flex-shrink: 0; }
+        .modal-loading { text-align: center; padding: 100px 0; color: #888; }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .pagination button {
+            padding: 8px 16px;
+            background: #2d2d44;
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+        }
+        .pagination button:hover { background: #3d3d54; }
+        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .pagination-info { color: #888; }
+        
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            h1 { font-size: 22px; }
+            .controls { gap: 10px; }
+            input { min-width: 100%; }
+            select { flex: 1; }
+            .stats { gap: 15px; padding: 12px; }
+            .stat-value { font-size: 16px; }
+            table { font-size: 13px; }
+            th, td { padding: 8px 6px; }
+            .modal { padding: 15px; border-radius: 8px; }
+            .modal-title { font-size: 16px; }
+            .modal-content-grid { flex-direction: column; align-items: center; }
+            .modal-image { width: 150px; }
+            .chart-container { height: 250px; }
+            .modal-stats { gap: 12px; }
+            .modal-stat-value { font-size: 14px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Grand Money Exchange</h1>
+        <p class="subtitle" id="lastUpdate">Loading prices...</p>
+        
+        <div class="controls">
+            <input type="text" id="search" placeholder="Search items...">
+            <select id="currency">
+                <option value="CAD">CAD ($)</option>
+                <option value="USD">USD ($)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="AUD">AUD ($)</option>
+                <option value="BRL">BRL (R$)</option>
+                <option value="DKK">DKK (kr.)</option>
+                <option value="SEK">SEK (kr)</option>
+            </select>
+            <select id="sortBy">
+                <option value="volume">Sort by Volume</option>
+                <option value="gp">Sort by Price</option>
+            </select>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">Bond Price (GP)</div>
+                <div class="stat-value" id="bondPrice">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">GP per 1 <span id="currencySymbol">$</span></div>
+                <div class="stat-value" id="gpPerUnit">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Items Loaded</div>
+                <div class="stat-value" id="itemCount">-</div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">Fetching Grand Exchange prices...</div>
+        <div id="error" class="error" style="display:none;"></div>
+        <div class="table-wrapper">
+            <table id="itemsTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th data-sort="volume">Item Name</th>
+                        <th data-sort="gp">GP Price</th>
+                        <th data-sort="gp">Local Currency</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsBody"></tbody>
+            </table>
+        </div>
+        <div class="pagination" id="pagination" style="display:none;">
+            <button id="prevPage">&larr; Prev</button>
+            <span class="pagination-info" id="pageInfo"></span>
+            <button id="nextPage">Next &rarr;</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">Item Name</div>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div id="modalContent">
+                <div class="modal-loading">Loading price history...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BOND_REAL_PRICES = {
+            USD: { price: 8.99, symbol: '$' },
+            GBP: { price: 6.49, symbol: '£' },
+            EUR: { price: 7.99, symbol: '€' },
+            CAD: { price: 11.49, symbol: '$' },
+            AUD: { price: 12.99, symbol: '$' },
+            BRL: { price: 21.99, symbol: 'R$' },
+            DKK: { price: 57.00, symbol: 'kr.' },
+            SEK: { price: 77.00, symbol: 'kr' }
+        };
+
+        let allItems = [];
+        let bondPrice = 0;
+        let currentPage = 1;
+        const pageSize = 50;
+        let itemImages = {};
+
+        async function loadImages() {
+            try {
+                const response = await fetch('item_images.json');
+                itemImages = await response.json();
+            } catch (e) {
+                console.log('No item images loaded');
+            }
+        }
+
+        async function loadData() {
+            try {
+                const response = await fetch('https://chisel.weirdgloop.org/gazproj/gazbot/rs_dump.json');
+                const data = await response.json();
+                
+                const timestamp = data['%JAGEX_TIMESTAMP%'];
+                if (timestamp) {
+                    const date = new Date(timestamp * 1000);
+                    document.getElementById('lastUpdate').textContent = `Last updated: ${date.toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}`;
+                }
+                
+                allItems = Object.entries(data)
+                    .filter(([key]) => !key.startsWith('%'))
+                    .map(([id, item]) => ({ 
+                        name: item.name, 
+                        gp: item.price || 0, 
+                        volume: item.volume || 0 
+                    }));
+                
+                const bond = allItems.find(i => i.name === 'Bond');
+                bondPrice = bond ? bond.gp : 115879148;
+                document.getElementById('bondPrice').textContent = bondPrice.toLocaleString();
+                
+                document.getElementById('itemCount').textContent = allItems.length.toLocaleString();
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('itemsTable').style.display = 'table';
+                
+                renderItems();
+            } catch (err) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'Failed to load prices: ' + err.message;
+            }
+        }
+
+        function gpToLocal(gp, currency) {
+            return gp * (BOND_REAL_PRICES[currency].price / bondPrice);
+        }
+
+        function formatGP(gp) {
+            return gp.toLocaleString() + ' gp';
+        }
+
+        function formatLocal(amount, currency) {
+            const info = BOND_REAL_PRICES[currency];
+            let decimals = 2;
+            if (amount > 0 && amount < 1) {
+                decimals = Math.max(2, -Math.floor(Math.log10(amount)) + 1);
+            }
+            return info.symbol + amount.toLocaleString(undefined, { 
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals 
+            });
+        }
+
+        function getFilteredAndSortedItems() {
+            const search = document.getElementById('search').value.toLowerCase();
+            const currency = document.getElementById('currency').value;
+            const sortBy = document.getElementById('sortBy').value;
+            
+            let filtered = allItems.filter(item => 
+                item.name.toLowerCase().includes(search)
+            );
+            
+            filtered = filtered.map(item => ({
+                ...item,
+                local: gpToLocal(item.gp, currency)
+            }));
+            
+            if (sortBy === 'volume') {
+                filtered.sort((a, b) => b.volume - a.volume);
+            } else {
+                filtered.sort((a, b) => b.gp - a.gp);
+            }
+            
+            return filtered;
+        }
+
+        function renderItems() {
+            const currency = document.getElementById('currency').value;
+            const items = getFilteredAndSortedItems();
+            
+            const currencyInfo = BOND_REAL_PRICES[currency];
+            const gpPerUnit = bondPrice / currencyInfo.price;
+            document.getElementById('gpPerUnit').textContent = Math.round(gpPerUnit).toLocaleString();
+            document.getElementById('currencySymbol').textContent = currencyInfo.symbol;
+            
+            const totalPages = Math.ceil(items.length / pageSize);
+            if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
+            
+            const start = (currentPage - 1) * pageSize;
+            const pageItems = items.slice(start, start + pageSize);
+            
+            const tbody = document.getElementById('itemsBody');
+            tbody.innerHTML = pageItems.map(item => {
+                const imgSrc = itemImages[item.name];
+                const imgHtml = imgSrc ? `<img src="${imgSrc}" alt="${item.name}" class="item-thumb" onerror="this.style.display='none'">` : '<span class="item-thumb"></span>';
+                return `
+                <tr class="item-row" data-name="${item.name.replace(/"/g, '&quot;')}" data-volume="${item.volume}">
+                    <td><div class="item-name-cell">${imgHtml}${item.name}</div></td>
+                    <td class="gp">${formatGP(item.gp)}</td>
+                    <td class="local-currency">${formatLocal(item.local, currency)}</td>
+                </tr>
+            `}).join('');
+            
+            document.querySelectorAll('.item-row').forEach(row => {
+                row.addEventListener('click', () => openModal(row.dataset.name, parseInt(row.dataset.volume)));
+            });
+            
+            const pagination = document.getElementById('pagination');
+            if (items.length > pageSize) {
+                pagination.style.display = 'flex';
+                document.getElementById('prevPage').disabled = currentPage === 1;
+                document.getElementById('nextPage').disabled = currentPage === totalPages;
+                document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages} (${items.length.toLocaleString()} items)`;
+            } else {
+                pagination.style.display = 'none';
+            }
+        }
+        
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderItems();
+            }
+        });
+        
+        document.getElementById('nextPage').addEventListener('click', () => {
+            const items = getFilteredAndSortedItems();
+            const totalPages = Math.ceil(items.length / pageSize);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderItems();
+            }
+        });
+
+        let priceChart = null;
+        const historyCache = {};
+
+        async function openModal(itemName, volume) {
+            const modal = document.getElementById('modal');
+            const title = document.getElementById('modalTitle');
+            const content = document.getElementById('modalContent');
+            
+            const imgHtml = itemImages[itemName] ? `<img src="${itemImages[itemName]}" alt="${itemName}" onerror="this.style.display='none'">` : '';
+            title.innerHTML = `${imgHtml}${itemName}`;
+            content.innerHTML = '<div class="modal-loading">Loading price history...</div>';
+            modal.classList.add('active');
+            
+            try {
+                let historyData;
+                if (historyCache[itemName]) {
+                    historyData = historyCache[itemName];
+                } else {
+                    const response = await fetch(`https://api.weirdgloop.org/exchange/history/rs/all?name=${encodeURIComponent(itemName)}`);
+                    const data = await response.json();
+                    historyData = data[itemName] || [];
+                    historyCache[itemName] = historyData;
+                }
+                
+                if (historyData.length === 0) {
+                    content.innerHTML = '<div class="modal-loading">No historical data available</div>';
+                    return;
+                }
+                
+                const currency = document.getElementById('currency').value;
+                const currencyInfo = BOND_REAL_PRICES[currency];
+                
+                const labels = historyData.map(d => {
+                    const date = new Date(d.timestamp);
+                    return date.toLocaleDateString('en-CA', { month: 'short', year: '2-digit' });
+                });
+                const prices = historyData.map(d => gpToLocal(d.price, currency));
+                
+                const currentPrice = prices[prices.length - 1];
+                const firstPrice = prices[0];
+                const minPrice = Math.min(...prices);
+                const maxPrice = Math.max(...prices);
+                const change = ((currentPrice - firstPrice) / firstPrice * 100).toFixed(1);
+                
+                content.innerHTML = `
+                    <div class="modal-content-grid">
+                        <div class="modal-chart-wrapper">
+                            <div class="chart-container">
+                                <canvas id="priceChart"></canvas>
+                            </div>
+                            <div class="modal-stats">
+                        <div class="modal-stat">
+                            <div class="modal-stat-label">Current</div>
+                            <div class="modal-stat-value">${formatLocal(currentPrice, currency)}</div>
+                        </div>
+                        <div class="modal-stat">
+                            <div class="modal-stat-label">All-Time High</div>
+                            <div class="modal-stat-value">${formatLocal(maxPrice, currency)}</div>
+                        </div>
+                        <div class="modal-stat">
+                            <div class="modal-stat-label">All-Time Low</div>
+                            <div class="modal-stat-value">${formatLocal(minPrice, currency)}</div>
+                        </div>
+                        <div class="modal-stat">
+                            <div class="modal-stat-label">All-Time Change</div>
+                            <div class="modal-stat-value" style="color: ${change >= 0 ? '#4CAF50' : '#ff6b6b'}">${change}%</div>
+                        </div>
+                        <div class="modal-stat">
+                            <div class="modal-stat-label">Daily Volume</div>
+                            <div class="modal-stat-value">${volume.toLocaleString()}</div>
+                        </div>
+                        <div class="modal-stat">
+                            <div class="modal-stat-label">Data Points</div>
+                            <div class="modal-stat-value">${historyData.length.toLocaleString()}</div>
+                        </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                if (priceChart) priceChart.destroy();
+                
+                const ctx = document.getElementById('priceChart').getContext('2d');
+                priceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: `Price (${currencyInfo.symbol})`,
+                            data: prices,
+                            borderColor: '#f0b90b',
+                            backgroundColor: 'rgba(240, 185, 11, 0.1)',
+                            fill: true,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                displayColors: false,
+                                callbacks: {
+                                    label: (ctx) => formatLocal(ctx.raw, currency)
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { 
+                                grid: { color: '#3d3d54' },
+                                ticks: { 
+                                    color: '#888',
+                                    maxTicksLimit: 12
+                                }
+                            },
+                            y: { 
+                                grid: { color: '#3d3d54' },
+                                ticks: { 
+                                    color: '#888',
+                                    callback: (v) => currencyInfo.symbol + v.toLocaleString(undefined, {maximumFractionDigits: 2})
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (err) {
+                content.innerHTML = `<div class="modal-loading">Failed to load history: ${err.message}</div>`;
+            }
+        }
+
+        document.getElementById('modalClose').addEventListener('click', () => {
+            document.getElementById('modal').classList.remove('active');
+        });
+        document.getElementById('modal').addEventListener('click', (e) => {
+            if (e.target.id === 'modal') {
+                document.getElementById('modal').classList.remove('active');
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('modal').classList.remove('active');
+            }
+        });
+
+        if (localStorage.getItem('gme_currency')) {
+            document.getElementById('currency').value = localStorage.getItem('gme_currency');
+        }
+        if (localStorage.getItem('gme_sortBy')) {
+            document.getElementById('sortBy').value = localStorage.getItem('gme_sortBy');
+        }
+
+        document.getElementById('search').addEventListener('input', () => {
+            currentPage = 1;
+            renderItems();
+        });
+        document.getElementById('currency').addEventListener('change', () => {
+            localStorage.setItem('gme_currency', document.getElementById('currency').value);
+            renderItems();
+            const modal = document.getElementById('modal');
+            const title = document.getElementById('modalTitle');
+            if (modal.classList.contains('active')) {
+                const item = allItems.find(i => i.name === title.textContent);
+                openModal(title.textContent, item ? item.volume : 0);
+            }
+        });
+        document.getElementById('sortBy').addEventListener('change', () => {
+            localStorage.setItem('gme_sortBy', document.getElementById('sortBy').value);
+            currentPage = 1;
+            renderItems();
+        });
+        
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                document.getElementById('sortBy').value = th.dataset.sort;
+                localStorage.setItem('gme_sortBy', th.dataset.sort);
+                currentPage = 1;
+                renderItems();
+            });
+        });
+
+        loadImages();
+        loadData();
+    </script>
+</body>
+</html>
