@@ -445,10 +445,12 @@
                     const date = new Date(d.timestamp);
                     return date.toLocaleDateString('en-CA', { month: 'short', year: '2-digit' });
                 });
-                const prices = historyData.map(d => {
-                    const bondPriceAtTime = bondMap ? bondMap.get(d.timestamp) : null;
-                    return gpToLocalHistorical(d.price, currency, bondPriceAtTime);
-                });
+                const prices = itemName === 'Bond' 
+                    ? historyData.map(() => currencyInfo.price)
+                    : historyData.map(d => {
+                        const bondPriceAtTime = bondMap ? bondMap.get(d.timestamp) : null;
+                        return gpToLocalHistorical(d.price, currency, bondPriceAtTime);
+                    });
                 
                 const currentPrice = prices[prices.length - 1];
                 const firstPrice = prices[0];
