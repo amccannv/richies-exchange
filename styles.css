@@ -158,6 +158,16 @@ tr:hover { background: #353548; }
 .item-row:hover { background: #404060 !important; }
 .item-name-cell { display: flex; align-items: center; gap: 10px; }
 .item-thumb { width: 28px; height: 28px; object-fit: contain; flex-shrink: 0; }
+.max-cash-star {
+    color: #f0b90b;
+    font-size: 12px;
+    margin-left: 4px;
+    cursor: help;
+    opacity: 0.9;
+}
+.max-cash-star:hover {
+    opacity: 1;
+}
 .per-wrapper { 
     white-space: nowrap;
 }
@@ -255,6 +265,74 @@ tr:hover { background: #353548; }
     color: #ccc;
 }
 .sort-dropdown div:hover { background: #3d3d54; color: #fff; }
+
+.game-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.game-btn {
+    padding: 6px 14px;
+    border: 1px solid #444;
+    background: #2a2a3a;
+    color: #888;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.game-btn:hover {
+    background: #35354a;
+}
+
+.game-btn.active {
+    background: #f0b90b;
+    color: #000;
+    border-color: #f0b90b;
+    font-weight: 500;
+}
+
+.live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: #4CAF50;
+    margin-left: 8px;
+}
+
+.live-dot {
+    width: 6px;
+    height: 6px;
+    background: #4CAF50;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.refresh-btn {
+    padding: 4px 10px;
+    border: 1px solid #444;
+    background: #2a2a3a;
+    color: #888;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-left: 4px;
+}
+
+.refresh-btn:hover {
+    background: #35354a;
+    color: #f0b90b;
+}
 
 @media (max-width: 768px) {
     body { padding: 10px; }

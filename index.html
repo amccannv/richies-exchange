@@ -15,6 +15,14 @@
 <body>
     <div class="container">
         <h1>Richie's Exchange</h1>
+        <div class="game-toggle">
+            <button id="rs3Toggle" class="game-btn active">RuneScape 3</button>
+            <button id="osrsToggle" class="game-btn">Old School</button>
+            <span id="liveIndicator" class="live-indicator" style="display:none">
+                <span class="live-dot"></span>LIVE
+            </span>
+            <button id="refreshBtn" class="refresh-btn" style="display:none" title="Refresh now">↻</button>
+        </div>
         <p class="subtitle" id="lastUpdate">Loading prices...</p>
         
         <div class="controls">
@@ -35,7 +43,7 @@
             <div class="bond-card-header">
                 <div class="bond-card-title">
                     <img src="" alt="Bond" class="bond-thumb" id="bondThumb" style="display:none;" onerror="this.style.display='none'">
-                    <span>Bond</span>
+                    <span id="bondCardTitle">Bond</span>
                 </div>
                 <div class="period-selector" id="bondPeriodSelector">
                     <div class="period-option" data-period="7">7</div>
