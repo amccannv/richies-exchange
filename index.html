@@ -115,6 +115,36 @@
         .item-row:hover { background: #404060 !important; }
         .item-name-cell { display: flex; align-items: center; gap: 10px; }
         .item-thumb { width: 28px; height: 28px; object-fit: contain; flex-shrink: 0; }
+        .per-wrapper { 
+            white-space: nowrap;
+        }
+        .per-label { 
+            color: #888; 
+            font-size: 11px; 
+            font-weight: normal;
+        }
+        .per-value { 
+            color: #888; 
+            font-size: 11px; 
+            font-weight: normal;
+            cursor: pointer;
+        }
+        .per-value:hover { 
+            color: #4CAF50; 
+        }
+        .multiplier-badge { 
+            background: #f0b90b; 
+            color: #1a1a2e; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-size: 11px; 
+            font-weight: bold;
+            margin-left: 4px;
+            cursor: pointer;
+        }
+        .multiplier-badge:hover { 
+            background: #ffcc00; 
+        }
         .modal-loading { text-align: center; padding: 100px 0; color: #888; }
         .pagination {
             display: flex;
@@ -134,6 +164,54 @@
         .pagination button:hover { background: #3d3d54; }
         .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
         .pagination-info { color: #888; }
+        
+        .sort-control {
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-start;
+            gap: 15px;
+            position: relative;
+            margin-bottom: 10px;
+        }
+        .currency-control {
+            position: relative;
+        }
+        .currency-control .sort-dropdown {
+            right: auto;
+            left: 0;
+        }
+        .sort-toggle {
+            background: transparent;
+            border: none;
+            color: #888;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .sort-toggle:hover { color: #fff; }
+        .sort-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #2d2d44;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 100;
+            min-width: 120px;
+            overflow: hidden;
+        }
+        .sort-dropdown.active { display: block; }
+        .sort-dropdown div {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #ccc;
+        }
+        .sort-dropdown div:hover { background: #3d3d54; color: #fff; }
         
         @media (max-width: 768px) {
             body { padding: 10px; }
@@ -162,7 +240,7 @@
         
         <div class="controls">
             <input type="text" id="search" placeholder="Search items...">
-            <select id="currency">
+            <select id="currency" style="display:none;">
                 <option value="CAD">CAD ($)</option>
                 <option value="USD">USD ($)</option>
                 <option value="GBP">GBP (£)</option>
@@ -171,10 +249,6 @@
                 <option value="BRL">BRL (R$)</option>
                 <option value="DKK">DKK (kr.)</option>
                 <option value="SEK">SEK (kr)</option>
-            </select>
-            <select id="sortBy">
-                <option value="volume">Sort by Volume</option>
-                <option value="gp">Sort by Price</option>
             </select>
         </div>
 
@@ -195,13 +269,39 @@
 
         <div id="loading" class="loading">Fetching Grand Exchange prices...</div>
         <div id="error" class="error" style="display:none;"></div>
+        <div class="sort-control">
+            <div class="currency-control">
+                <button id="currencyToggle" class="sort-toggle">
+                    <span id="currencyLabel">CAD $</span>
+                </button>
+                <div id="currencyDropdown" class="sort-dropdown">
+                    <div data-currency="CAD">CAD $</div>
+                    <div data-currency="USD">USD $</div>
+                    <div data-currency="GBP">GBP £</div>
+                    <div data-currency="EUR">EUR €</div>
+                    <div data-currency="AUD">AUD $</div>
+                    <div data-currency="BRL">BRL R$</div>
+                    <div data-currency="DKK">DKK kr.</div>
+                    <div data-currency="SEK">SEK kr</div>
+                </div>
+            </div>
+            <button id="sortToggle" class="sort-toggle">
+                <span id="sortLabel">Volume ↓</span>
+            </button>
+            <div id="sortDropdown" class="sort-dropdown">
+                <div data-sort="volume" data-dir="desc">Volume ↓</div>
+                <div data-sort="volume" data-dir="asc">Volume ↑</div>
+                <div data-sort="gp" data-dir="desc">Price ↓</div>
+                <div data-sort="gp" data-dir="asc">Price ↑</div>
+            </div>
+        </div>
         <div class="table-wrapper">
             <table id="itemsTable" style="display:none;">
                 <thead>
                     <tr>
-                        <th data-sort="volume">Item Name</th>
-                        <th data-sort="gp">GP Price</th>
-                        <th data-sort="gp">Local Currency</th>
+                        <th>Item Name</th>
+                        <th>GP Price</th>
+                        <th>Local Currency</th>
                     </tr>
                 </thead>
                 <tbody id="itemsBody"></tbody>
@@ -243,6 +343,8 @@
         let currentPage = 1;
         const pageSize = 50;
         let itemImages = {};
+        let sortBy = 'volume';
+        let sortDirection = 'desc';
 
         async function loadImages() {
             try {
@@ -297,22 +399,46 @@
             return gp.toLocaleString() + ' gp';
         }
 
-        function formatLocal(amount, currency) {
-            const info = BOND_REAL_PRICES[currency];
-            let decimals = 2;
-            if (amount > 0 && amount < 1) {
-                decimals = Math.max(2, -Math.floor(Math.log10(amount)) + 1);
+        const itemMultipliers = {};
+
+        function parseMultiplier(str) {
+            if (!str) return null;
+            str = str.trim().toLowerCase();
+            if (!str) return null;
+            
+            const multipliers = { 'k': 1000, 'm': 1000000, 'b': 1000000000 };
+            const lastChar = str.slice(-1);
+            
+            if (multipliers[lastChar]) {
+                const num = parseFloat(str.slice(0, -1));
+                return isNaN(num) ? null : num * multipliers[lastChar];
             }
-            return info.symbol + amount.toLocaleString(undefined, { 
-                minimumFractionDigits: decimals,
-                maximumFractionDigits: decimals 
+            
+            const num = parseFloat(str);
+            return isNaN(num) || num <= 0 ? null : num;
+        }
+
+        function needsMultiplier(amount) {
+            return amount > 0 && amount < 0.10;
+        }
+
+        function getDefaultMultiplier(amount) {
+            if (amount <= 0 || amount >= 0.10) return null;
+            return Math.pow(10, Math.ceil(Math.log10(0.10 / amount)));
+        }
+
+        function formatLocal(amount, currency, multiplier = null) {
+            const info = BOND_REAL_PRICES[currency];
+            const displayAmount = multiplier ? amount * multiplier : amount;
+            return info.symbol + displayAmount.toLocaleString(undefined, { 
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2 
             });
         }
 
         function getFilteredAndSortedItems() {
             const search = document.getElementById('search').value.toLowerCase();
             const currency = document.getElementById('currency').value;
-            const sortBy = document.getElementById('sortBy').value;
             
             let filtered = allItems.filter(item => 
                 item.name.toLowerCase().includes(search)
@@ -324,9 +450,9 @@
             }));
             
             if (sortBy === 'volume') {
-                filtered.sort((a, b) => b.volume - a.volume);
+                filtered.sort((a, b) => sortDirection === 'desc' ? b.volume - a.volume : a.volume - b.volume);
             } else {
-                filtered.sort((a, b) => b.gp - a.gp);
+                filtered.sort((a, b) => sortDirection === 'desc' ? b.gp - a.gp : a.gp - b.gp);
             }
             
             return filtered;
@@ -336,7 +462,13 @@
             const currency = document.getElementById('currency').value;
             const items = getFilteredAndSortedItems();
             
+            const sortNames = { 'volume': 'Volume', 'gp': 'Price' };
+            const arrow = sortDirection === 'desc' ? '↓' : '↑';
+            document.getElementById('sortLabel').textContent = `${sortNames[sortBy]} ${arrow}`;
+            
             const currencyInfo = BOND_REAL_PRICES[currency];
+            document.getElementById('currencyLabel').textContent = `${currency} ${currencyInfo.symbol}`;
+            
             const gpPerUnit = bondPrice / currencyInfo.price;
             document.getElementById('gpPerUnit').textContent = Math.round(gpPerUnit).toLocaleString();
             document.getElementById('currencySymbol').textContent = currencyInfo.symbol;
@@ -351,13 +483,58 @@
             tbody.innerHTML = pageItems.map(item => {
                 const imgSrc = itemImages[item.name];
                 const imgHtml = imgSrc ? `<img src="${imgSrc}" alt="${item.name}" class="item-thumb" onerror="this.style.display='none'">` : '<span class="item-thumb"></span>';
+                const showMultiplier = needsMultiplier(item.local);
+                const multiplier = itemMultipliers[item.name] || null;
+                const defaultMult = getDefaultMultiplier(item.local);
+                const displayMultiplier = multiplier || (showMultiplier ? defaultMult : null);
+                const priceDisplay = formatLocal(item.local, currency, displayMultiplier);
+                const perText = displayMultiplier ? ` <span class="per-wrapper"><span class="per-label">per</span> <span class="per-value multiplier-trigger" data-item="${item.name.replace(/"/g, '&quot;')}" title="Click to change quantity">${displayMultiplier.toLocaleString()}</span></span>` : '';
                 return `
                 <tr class="item-row" data-name="${item.name.replace(/"/g, '&quot;')}" data-volume="${item.volume}">
                     <td><div class="item-name-cell">${imgHtml}${item.name}</div></td>
                     <td class="gp">${formatGP(item.gp)}</td>
-                    <td class="local-currency">${formatLocal(item.local, currency)}</td>
+                    <td class="local-currency">${priceDisplay}${perText}</td>
                 </tr>
             `}).join('');
+            
+            document.querySelectorAll('.multiplier-trigger').forEach(perValue => {
+                perValue.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const itemName = perValue.dataset.item;
+                    const currentVal = itemMultipliers[itemName] || '';
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'multiplier-input';
+                    input.value = currentVal;
+                    input.placeholder = '1k';
+                    input.style.cssText = 'width:35px;max-width:35px;min-width:35px;font-size:11px;padding:0 1px;border:none;border-radius:3px;background:transparent;color:#4CAF50;font-weight:normal;text-align:center;outline:none;display:inline-block;box-sizing:border-box;';
+                    
+                    perValue.replaceWith(input);
+                    input.focus();
+                    input.select();
+                    
+                    const applyMultiplier = () => {
+                        const val = parseMultiplier(input.value);
+                        if (val) {
+                            itemMultipliers[itemName] = val;
+                        } else {
+                            delete itemMultipliers[itemName];
+                        }
+                        renderItems();
+                    };
+                    
+                    input.addEventListener('blur', applyMultiplier);
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            applyMultiplier();
+                        }
+                        if (e.key === 'Escape') {
+                            renderItems();
+                        }
+                    });
+                });
+            });
             
             document.querySelectorAll('.item-row').forEach(row => {
                 row.addEventListener('click', () => openModal(row.dataset.name, parseInt(row.dataset.volume)));
@@ -462,6 +639,15 @@
                 const minPrice = Math.min(...prices);
                 const maxPrice = Math.max(...prices);
                 const change = ((currentPrice - firstPrice) / firstPrice * 100).toFixed(1);
+                const showMultiplier = needsMultiplier(currentPrice);
+                const multiplier = itemMultipliers[itemName] || null;
+                const defaultMult = getDefaultMultiplier(currentPrice);
+                const displayMultiplier = multiplier || (showMultiplier ? defaultMult : null);
+                const perText = displayMultiplier ? ` <span class="per-wrapper"><span class="per-label">per</span> <span class="per-value multiplier-modal-trigger" title="Click to change quantity">${displayMultiplier.toLocaleString()}</span></span>` : '';
+                
+                title.innerHTML = `${imgHtml}${itemName}`;
+                
+                const perLabelEl = null;
                 
                 content.innerHTML = `
                     <div class="modal-content-grid">
@@ -472,15 +658,15 @@
                             <div class="modal-stats">
                         <div class="modal-stat">
                             <div class="modal-stat-label">Current</div>
-                            <div class="modal-stat-value">${formatLocal(currentPrice, currency)}</div>
+                            <div class="modal-stat-value">${formatLocal(currentPrice, currency, displayMultiplier)}${perText}</div>
                         </div>
                         <div class="modal-stat">
                             <div class="modal-stat-label">All-Time High</div>
-                            <div class="modal-stat-value">${formatLocal(maxPrice, currency)}</div>
+                            <div class="modal-stat-value">${formatLocal(maxPrice, currency, displayMultiplier)}</div>
                         </div>
                         <div class="modal-stat">
                             <div class="modal-stat-label">All-Time Low</div>
-                            <div class="modal-stat-value">${formatLocal(minPrice, currency)}</div>
+                            <div class="modal-stat-value">${formatLocal(minPrice, currency, displayMultiplier)}</div>
                         </div>
                         <div class="modal-stat">
                             <div class="modal-stat-label">All-Time Change</div>
@@ -499,6 +685,8 @@
                     </div>
                 `;
                 
+                const displayPrices = displayMultiplier ? prices.map(p => p * displayMultiplier) : prices;
+                
                 if (priceChart) priceChart.destroy();
                 
                 const ctx = document.getElementById('priceChart').getContext('2d');
@@ -507,8 +695,8 @@
                     data: {
                         labels: labels,
                         datasets: [{
-                            label: `Price (${currencyInfo.symbol})`,
-                            data: prices,
+                            label: `Price (${currencyInfo.symbol}${displayMultiplier ? ' per ' + displayMultiplier.toLocaleString() : ''})`,
+                            data: displayPrices,
                             borderColor: '#f0b90b',
                             backgroundColor: 'rgba(240, 185, 11, 0.1)',
                             fill: true,
@@ -542,12 +730,51 @@
                                 grid: { color: '#3d3d54' },
                                 ticks: { 
                                     color: '#888',
-                                    callback: (v) => currencyInfo.symbol + v.toLocaleString(undefined, {maximumFractionDigits: 2})
+                                    callback: (v) => formatLocal(v, currency)
                                 }
                             }
                         }
                     }
                 });
+                
+                const modalPerValue = content.querySelector('.multiplier-modal-trigger');
+                if (modalPerValue) {
+                    modalPerValue.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const currentVal = itemMultipliers[itemName] || '';
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.className = 'multiplier-input';
+                        input.value = currentVal;
+                        input.placeholder = '1k';
+                        input.style.cssText = 'width:35px;max-width:35px;min-width:35px;font-size:11px;padding:0 1px;border:none;border-radius:3px;background:transparent;color:#4CAF50;font-weight:normal;text-align:center;outline:none;display:inline-block;box-sizing:border-box;';
+                        
+                        modalPerValue.replaceWith(input);
+                        input.focus();
+                        input.select();
+                        
+                        const applyMultiplier = () => {
+                            const val = parseMultiplier(input.value);
+                            if (val) {
+                                itemMultipliers[itemName] = val;
+                            } else {
+                                delete itemMultipliers[itemName];
+                            }
+                            openModal(itemName, volume);
+                        };
+                        
+                        input.addEventListener('blur', applyMultiplier);
+                        input.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                applyMultiplier();
+                            }
+                            if (e.key === 'Escape') {
+                                openModal(itemName, volume);
+                            }
+                        });
+                    });
+                }
             } catch (err) {
                 content.innerHTML = `<div class="modal-loading">Failed to load history: ${err.message}</div>`;
             }
@@ -571,7 +798,10 @@
             document.getElementById('currency').value = localStorage.getItem('gme_currency');
         }
         if (localStorage.getItem('gme_sortBy')) {
-            document.getElementById('sortBy').value = localStorage.getItem('gme_sortBy');
+            sortBy = localStorage.getItem('gme_sortBy');
+        }
+        if (localStorage.getItem('gme_sortDir')) {
+            sortDirection = localStorage.getItem('gme_sortDir');
         }
 
         document.getElementById('search').addEventListener('input', () => {
@@ -588,19 +818,51 @@
                 openModal(title.textContent, item ? item.volume : 0);
             }
         });
-        document.getElementById('sortBy').addEventListener('change', () => {
-            localStorage.setItem('gme_sortBy', document.getElementById('sortBy').value);
-            currentPage = 1;
-            renderItems();
+        
+        document.getElementById('currencyToggle').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('currencyDropdown').classList.toggle('active');
+            document.getElementById('sortDropdown').classList.remove('active');
         });
         
-        document.querySelectorAll('th[data-sort]').forEach(th => {
-            th.addEventListener('click', () => {
-                document.getElementById('sortBy').value = th.dataset.sort;
-                localStorage.setItem('gme_sortBy', th.dataset.sort);
+        document.querySelectorAll('#currencyDropdown div').forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('currency').value = option.dataset.currency;
+                localStorage.setItem('gme_currency', option.dataset.currency);
+                document.getElementById('currencyDropdown').classList.remove('active');
+                renderItems();
+                const modal = document.getElementById('modal');
+                const title = document.getElementById('modalTitle');
+                if (modal.classList.contains('active')) {
+                    const item = allItems.find(i => i.name === title.textContent);
+                    openModal(title.textContent, item ? item.volume : 0);
+                }
+            });
+        });
+        
+        document.getElementById('sortToggle').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('sortDropdown').classList.toggle('active');
+            document.getElementById('currencyDropdown').classList.remove('active');
+        });
+        
+        document.querySelectorAll('#sortDropdown div').forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                sortBy = option.dataset.sort;
+                sortDirection = option.dataset.dir;
+                localStorage.setItem('gme_sortBy', sortBy);
+                localStorage.setItem('gme_sortDir', sortDirection);
+                document.getElementById('sortDropdown').classList.remove('active');
                 currentPage = 1;
                 renderItems();
             });
+        });
+        
+        document.addEventListener('click', (e) => {
+            document.getElementById('sortDropdown').classList.remove('active');
+            document.getElementById('currencyDropdown').classList.remove('active');
         });
 
         loadImages();
