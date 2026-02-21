@@ -34,6 +34,7 @@ let bondPrice = 0;
 let currentPage = 1;
 const pageSize = 25;
 let itemImages = {};
+let osrsItemImages = {};
 let sortBy = 'volume';
 let sortDirection = 'desc';
 
@@ -42,8 +43,24 @@ async function loadImages() {
         const response = await fetch('item_images.json');
         itemImages = await response.json();
     } catch (e) {
-        console.log('No item images loaded');
+        console.log('No RS3 item images loaded');
     }
+}
+
+async function loadOSRSImages() {
+    try {
+        const response = await fetch('osrs_item_images.json');
+        osrsItemImages = await response.json();
+    } catch (e) {
+        console.log('No OSRS item images loaded');
+    }
+}
+
+function getItemImage(itemName) {
+    if (currentGame === 'osrs') {
+        return osrsItemImages[itemName];
+    }
+    return itemImages[itemName];
 }
 
 function startAutoRefresh() {
@@ -107,13 +124,10 @@ async function loadOSRSData() {
         
         document.getElementById('bondCardTitle').textContent = 'Old school bond';
         
-        if (itemImages['Old school bond']) {
+        const bondImg = getItemImage('Old school bond') || getItemImage('Bond');
+        if (bondImg) {
             const bondThumb = document.getElementById('bondThumb');
-            bondThumb.src = itemImages['Old school bond'];
-            bondThumb.style.display = 'inline';
-        } else if (itemImages['Bond']) {
-            const bondThumb = document.getElementById('bondThumb');
-            bondThumb.src = itemImages['Bond'];
+            bondThumb.src = bondImg;
             bondThumb.style.display = 'inline';
         }
         document.getElementById('bondPriceCard').textContent = bondPrice.toLocaleString() + ' gp';
@@ -215,9 +229,10 @@ async function loadRS3Data() {
         
         document.getElementById('bondCardTitle').textContent = 'Bond';
         
-        if (itemImages['Bond']) {
+        const bondImg = getItemImage('Bond');
+        if (bondImg) {
             const bondThumb = document.getElementById('bondThumb');
-            bondThumb.src = itemImages['Bond'];
+            bondThumb.src = bondImg;
             bondThumb.style.display = 'inline';
         }
         document.getElementById('bondPriceCard').textContent = bondPrice.toLocaleString() + ' gp';
@@ -455,7 +470,7 @@ function renderItems() {
     
     const tbody = document.getElementById('itemsBody');
     tbody.innerHTML = pageItems.map(item => {
-        const imgSrc = itemImages[item.name];
+        const imgSrc = getItemImage(item.name);
         const imgHtml = imgSrc ? `<img src="${imgSrc}" alt="${item.name}" class="item-thumb" onerror="this.style.display='none'">` : '<span class="item-thumb"></span>';
         const showMultiplier = needsMultiplier(item.local);
         const multiplier = itemMultipliers[item.name] || null;
@@ -598,7 +613,7 @@ async function openModal(itemName, volume) {
     currentModalItem = itemName;
     currentModalVolume = volume;
     
-    const imgHtml = itemImages[itemName] ? `<img src="${itemImages[itemName]}" alt="${itemName}" onerror="this.style.display='none'">` : '';
+    const imgHtml = getItemImage(itemName) ? `<img src="${getItemImage(itemName)}" alt="${itemName}" onerror="this.style.display='none'">` : '';
     title.innerHTML = `${imgHtml}${itemName}`;
     content.innerHTML = '<div class="modal-loading">Loading price history...</div>';
     modal.classList.add('active');
@@ -1137,4 +1152,4 @@ updatePeriodLabels();
 document.getElementById('rs3Toggle').classList.toggle('active', currentGame === 'rs3');
 document.getElementById('osrsToggle').classList.toggle('active', currentGame === 'osrs');
 
-loadImages().then(() => loadGameData());
+loadImages().then(() => loadOSRSImages()).then(() => loadGameData());

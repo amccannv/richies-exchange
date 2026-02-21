@@ -1,0 +1,50 @@
+[
+  {
+    "item": "Crystal 2h axe",
+    "url_tried": "https://oldschool.runescape.wiki/w/File:Crystal%202h%20axe.png",
+    "result": "error",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "item": "Crystal 2h axe (inactive)",
+    "url_tried": "https://oldschool.runescape.wiki/w/File:Crystal%202h%20axe%20%28inactive%29.png",
+    "result": "error",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "item": "Sigil of the adroit",
+    "url_tried": "https://oldschool.runescape.wiki/w/File:Sigil%20of%20the%20adroit.png",
+    "result": "error",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "item": "Sigil of the gunslinger",
+    "url_tried": "https://oldschool.runescape.wiki/w/File:Sigil%20of%20the%20gunslinger.png",
+    "result": "error",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "item": "Sigil of the rampart",
+    "url_tried": "https://oldschool.runescape.wiki/w/File:Sigil%20of%20the%20rampart.png",
+    "result": "error",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "item": "Sigil of the swashbuckler",
+    "url_tried": "https://oldschool.runescape.wiki/w/File:Sigil%20of%20the%20swashbuckler.png",
+    "result": "error",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "item": "Sigil of the well fed",
+    "url_tried": "https://oldschool.runescape.wiki/w/File:Sigil%20of%20the%20well%20fed.png",
+    "result": "error",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "item": "Teleport to boat",
+    "url_tried": "https://oldschool.runescape.wiki/w/File:Teleport%20to%20boat.png",
+    "result": "error",
+    "error": "HTTP Error 404: Not Found"
+  }
+]
