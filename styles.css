@@ -362,3 +362,24 @@ tr:hover { background: #353548; }
     .bond-stat-label { font-size: 10px; }
     .bond-stat-value { font-size: 13px; }
 }
+
+.swap-rate {
+    text-align: center;
+    padding: 12px 15px;
+    margin-bottom: 20px;
+    background: #2d2d44;
+    border-radius: 8px;
+    border: 1px solid #3d3d54;
+    font-size: 14px;
+    color: #ccc;
+}
+
+.swap-rate strong {
+    color: #f0b90b;
+}
+
+.swap-detail {
+    color: #888;
+    font-size: 12px;
+    margin-left: 8px;
+}

@@ -31,6 +31,8 @@ let osrsMapping = null;
 let autoRefreshInterval = null;
 let allItems = [];
 let bondPrice = 0;
+let rs3BondPrice = 0;
+let osrsBondPrice = 0;
 let currentPage = 1;
 const pageSize = 25;
 let itemImages = {};
@@ -121,6 +123,8 @@ async function loadOSRSData() {
         
         const bond = allItems.find(i => i.name.toLowerCase() === 'old school bond');
         bondPrice = bond ? bond.gp : 0;
+        osrsBondPrice = bondPrice;
+        updateSwapRate();
         
         document.getElementById('bondCardTitle').textContent = 'Old school bond';
         
@@ -140,6 +144,7 @@ async function loadOSRSData() {
         
         updateLastUpdateTime();
         renderItems();
+        fetchOtherGameBondPrice();
     } catch (err) {
         document.getElementById('loading').style.display = 'none';
         document.getElementById('error').style.display = 'block';
@@ -171,8 +176,8 @@ async function loadGameData() {
 function updatePeriodLabels() {
     const allOption = document.querySelector('#bondPeriodSelector .period-option[data-period="all"]');
     const modalAllOption = document.querySelector('#periodSelector .period-option[data-period="all"]');
-    if (allOption) allOption.textContent = currentGame === 'osrs' ? '365' : 'all';
-    if (modalAllOption) modalAllOption.textContent = currentGame === 'osrs' ? '365' : 'all';
+    if (allOption) allOption.textContent = '365';
+    if (modalAllOption) modalAllOption.textContent = '365';
 }
 
 function switchGame(game) {
@@ -226,6 +231,8 @@ async function loadRS3Data() {
         
         const bond = allItems.find(i => i.name === 'Bond');
         bondPrice = bond ? bond.gp : 115879148;
+        rs3BondPrice = bondPrice;
+        updateSwapRate();
         
         document.getElementById('bondCardTitle').textContent = 'Bond';
         
@@ -244,6 +251,7 @@ async function loadRS3Data() {
         document.getElementById('itemsTable').style.display = 'table';
         
         renderItems();
+        fetchOtherGameBondPrice();
     } catch (err) {
         document.getElementById('loading').style.display = 'none';
         document.getElementById('error').style.display = 'block';
@@ -294,16 +302,11 @@ function updateBondCardDisplay() {
     let periodLabel;
     
     if (periodValue === 'all') {
-        if (currentGame === 'osrs') {
-            const cutoffDate = new Date();
-            cutoffDate.setDate(cutoffDate.getDate() - 365);
-            history = bondHistoryCache.filter(d => new Date(d.timestamp) >= cutoffDate);
-            if (history.length === 0) history = bondHistoryCache.slice(-1);
-            periodLabel = '365-Day';
-        } else {
-            history = bondHistoryCache;
-            periodLabel = 'All-Time';
-        }
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - 365);
+        history = bondHistoryCache.filter(d => new Date(d.timestamp) >= cutoffDate);
+        if (history.length === 0) history = bondHistoryCache.slice(-1);
+        periodLabel = '365-Day';
     } else {
         const days = parseInt(periodValue);
         const cutoffDate = new Date();
@@ -375,6 +378,60 @@ function updateBondLocalPrice() {
     const gpPerUnit = Math.round(bondPrice / currencyInfo.price);
     document.getElementById('bondGpPerUnit').textContent = gpPerUnit.toLocaleString();
     document.getElementById('bondCurrencySymbol').textContent = currencyInfo.symbol;
+}
+
+function updateSwapRate() {
+    const swapRateEl = document.getElementById('swapRate');
+    if (rs3BondPrice > 0 && osrsBondPrice > 0) {
+        const ratio = rs3BondPrice / osrsBondPrice;
+        const rs3GpPerDollar = Math.round(rs3BondPrice / BOND_REAL_PRICES.USD.price);
+        const osrsGpPerDollar = Math.round(osrsBondPrice / BOND_REAL_PRICES.USD.price);
+        document.getElementById('swapRateText').innerHTML = 
+            `<strong>${ratio.toFixed(1)} RS3 GP</strong> = <strong>1 OSRS GP</strong> ` +
+            `<span class="swap-detail">(${rs3GpPerDollar.toLocaleString()} RS3 GP/$ vs ${osrsGpPerDollar.toLocaleString()} OSRS GP/$)</span>`;
+        swapRateEl.style.display = 'block';
+    } else {
+        swapRateEl.style.display = 'none';
+    }
+}
+
+async function fetchOtherGameBondPrice() {
+    if (currentGame === 'rs3' && !osrsBondPrice) {
+        try {
+            const mappingResp = await fetch(GAME_CONFIG.osrs.mappingUrl, {
+                headers: { 'User-Agent': 'richies-exchange/1.0 - cozydrew on Discord' }
+            });
+            const mappingData = await mappingResp.json();
+            const bondMapping = mappingData.find(i => i.name.toLowerCase() === 'old school bond');
+            if (!bondMapping) return;
+            
+            const pricesResp = await fetch(GAME_CONFIG.osrs.pricesUrl, {
+                headers: { 'User-Agent': 'richies-exchange/1.0 - cozydrew on Discord' }
+            });
+            const pricesData = await pricesResp.json();
+            const bondPrices = pricesData.data[bondMapping.id];
+            if (bondPrices && (bondPrices.high || bondPrices.low)) {
+                osrsBondPrice = bondPrices.high && bondPrices.low 
+                    ? Math.round((bondPrices.high + bondPrices.low) / 2) 
+                    : (bondPrices.high || bondPrices.low);
+                updateSwapRate();
+            }
+        } catch (e) {
+            console.log('Could not fetch OSRS bond price for swap rate');
+        }
+    } else if (currentGame === 'osrs' && !rs3BondPrice) {
+        try {
+            const response = await fetch(GAME_CONFIG.rs3.pricesUrl);
+            const data = await response.json();
+            const bondEntry = Object.entries(data).find(([id, item]) => item.name === 'Bond');
+            if (bondEntry) {
+                rs3BondPrice = bondEntry[1].price || 0;
+                updateSwapRate();
+            }
+        } catch (e) {
+            console.log('Could not fetch RS3 bond price for swap rate');
+        }
+    }
 }
 
 function formatGP(gp) {
@@ -644,8 +701,13 @@ async function openModal(itemName, volume) {
             let periodLabel;
             
             if (periodValue === 'all') {
-                historyData = fullHistoryData;
-                periodLabel = 'All-Time';
+                const cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - 365);
+                historyData = fullHistoryData.filter(d => new Date(d.timestamp) >= cutoffDate);
+                if (historyData.length === 0) {
+                    historyData = fullHistoryData.slice(-1);
+                }
+                periodLabel = '365-Day';
             } else {
                 const days = parseInt(periodValue);
                 const cutoffDate = new Date();
